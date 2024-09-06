@@ -112,6 +112,19 @@ async fn create_task(app_state: web::Data<AppState>, task: web::Json<Task>) -> i
     HttpResponse::Ok().finish() // Respond with a success status
 }
 
+// Handler to retrieve specific task
+async fn read_task(app_state: web::Data<AppState>, id: web::Path<u64>) -> impl Responder {
+    let db: std::sync::MutexGuard<Database> = app_state.db.lock().unwrap(); // Acquire a lock on the database to safely access it in a multi-threaded environment
+
+    // Attempt to retrieve the task with the provided `id`
+    match db.get(&id.into_inner()) {
+        // If the task is found, respond with HTTP 200 OK and the task serialized as JSON
+        Some(task) => HttpResponse::Ok().json(task),
+        // If the task is not found, respond with HTTP 404 Not Found
+        None => HttpResponse::NotFound().finish()
+    }
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
 
@@ -142,6 +155,7 @@ async fn main() -> std::io::Result<()> {
             )
             .app_data(data.clone()) // Share the application state with handlers
             .route("/task", web::post().to(create_task)) // Define an endpoint for creating tasks
+            .route("/task/{id}", web::get().to(read_task)) // Define an endpoint for retrieving specific task
     })
     .bind("127.0.0.1:8080")? // Bind the server to the local IP address and port 8080
     .run() // Run the server
