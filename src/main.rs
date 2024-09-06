@@ -106,7 +106,8 @@ struct AppState {
 
 // Handler to create a task
 async fn create_task(app_state: web::Data<AppState>, task: web::Json<Task>) -> impl Responder {
-    let mut db: std::sync::MutexGuard<Database> = app_state.db.lock().unwrap();
+    let mut db: std::sync::MutexGuard<Database> = app_state.db.lock().unwrap(); // Acquire a lock on the database to safely access it in a multi-threaded environment
+
     db.insert(task.into_inner()); // Insert the new task
     let _ = db.save_to_file(); // Save the database to a file
     HttpResponse::Ok().finish() // Respond with a success status
@@ -120,9 +121,36 @@ async fn read_task(app_state: web::Data<AppState>, id: web::Path<u64>) -> impl R
     match db.get(&id.into_inner()) {
         // If the task is found, respond with HTTP 200 OK and the task serialized as JSON
         Some(task) => HttpResponse::Ok().json(task),
+
         // If the task is not found, respond with HTTP 404 Not Found
         None => HttpResponse::NotFound().finish()
     }
+}
+
+// Handler or retrieving all tasks
+async fn read_all_tasks(app_state: web::Data<AppState>) -> impl Responder {
+    let db: std::sync::MutexGuard<Database> = app_state.db.lock().unwrap(); // Acquire a lock on the database to safely access it in a multi-threaded environment
+
+    let tasks = db.get_all();
+    HttpResponse::Ok().json(tasks)
+}
+
+// Handler for updating task
+async fn update_task(app_state: web::Data<AppState>, task: web::Json<Task>) -> impl Responder {
+    let mut db: std::sync::MutexGuard<Database> = app_state.db.lock().unwrap(); // Acquire a lock on the database to safely access it in a multi-threaded environment
+
+    db.update(task.into_inner()); // Update the task
+    let _ = db.save_to_file(); // Save the database to a file
+    HttpResponse::Ok().finish() // Respond with a success status
+}
+
+// Handler for deleting specific task
+async fn delete_task(app_state: web::Data<AppState>, id: web::Path<u64>) -> impl Responder {
+    let mut db: std::sync::MutexGuard<Database> = app_state.db.lock().unwrap(); // Acquire a lock on the database to safely access it in a multi-threaded environment
+
+    db.delete(&id.into_inner()); // Delete the task
+    let _ = db.save_to_file(); // Save the database to a file// Save the database to a file
+    HttpResponse::Ok().finish() // Respond with a success status
 }
 
 #[actix_web::main]
@@ -156,6 +184,10 @@ async fn main() -> std::io::Result<()> {
             .app_data(data.clone()) // Share the application state with handlers
             .route("/task", web::post().to(create_task)) // Define an endpoint for creating tasks
             .route("/task/{id}", web::get().to(read_task)) // Define an endpoint for retrieving specific task
+            .route("/task", web::get().to(read_all_tasks)) // Define an endpoint for retrieving all tasks
+            .route("/task", web::put().to(update_task)) // Define an endpoint for updating specific task
+            .route("/task/{id}", web::delete().to(delete_task)) // Define an endpoint for deleting specific task
+
     })
     .bind("127.0.0.1:8080")? // Bind the server to the local IP address and port 8080
     .run() // Run the server

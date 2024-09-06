@@ -1,1 +1,1 @@
-{"tasks":{"1":{"id":1,"name":"My first task.","completed":false}},"users":{}}
+{"tasks":{"1":{"id":1,"name":"Study","completed":false},"2":{"id":2,"name":"My second task.","completed":true},"3":{"id":3,"name":"My third task.","completed":false}},"users":{}}
