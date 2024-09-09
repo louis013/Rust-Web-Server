@@ -153,6 +153,30 @@ async fn delete_task(app_state: web::Data<AppState>, id: web::Path<u64>) -> impl
     HttpResponse::Ok().finish() // Respond with a success status
 }
 
+// Handler for registering user
+async fn register(app_state: web::Data<AppState>, user: web::Json<User>) -> impl Responder {
+    let mut db: std::sync::MutexGuard<Database> = app_state.db.lock().unwrap(); // Acquire a lock on the database to safely access it in a multi-threaded environment
+
+    db.insert_user(user.into_inner()); // Insert the new user into the database
+    let _ = db.save_to_file(); // Save the updated database to a file to persist the user
+    HttpResponse::Ok().finish() // Respond with HTTP 200 OK status
+}
+
+// Handler for logging in user
+async fn login(app_state: web::Data<AppState>, user: web::Json<User>) -> impl Responder {
+    let db: std::sync::MutexGuard<Database> = app_state.db.lock().unwrap(); // Acquire a lock on the database to safely access it in a multi-threaded environment
+
+    // Attempt to retrieve the user by username
+    match db.get_user_by_name(&user.username) {
+        // Check if the stored user's password matches the provided password
+        Some(stored_user) if stored_user.password == user.password => {
+            HttpResponse::Ok().body("Logged in!") // Respond with a success message if credentials are correct
+        },
+        // If username or password is incorrect, respond with an error message
+        _ => HttpResponse::BadRequest().body("Invalid username or password")
+    }
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
 
@@ -187,6 +211,8 @@ async fn main() -> std::io::Result<()> {
             .route("/task", web::get().to(read_all_tasks)) // Define an endpoint for retrieving all tasks
             .route("/task", web::put().to(update_task)) // Define an endpoint for updating specific task
             .route("/task/{id}", web::delete().to(delete_task)) // Define an endpoint for deleting specific task
+            .route("/register", web::post().to(register)) // Define an endpoint for user registration
+            .route("/login", web::post().to(login)) // Define an enpoit for user login
 
     })
     .bind("127.0.0.1:8080")? // Bind the server to the local IP address and port 8080
